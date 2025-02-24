@@ -136,18 +136,22 @@ def encontrar_arbol_expansion_minima(w, s):
         E2.append([i[0] + 1, i[1] + 1])
     return [E2, suma]
 
-def nodos_impares(arbol_expansion_minima, size): #obtener los nodos del arbol de expansión mínima que tienen grado impar
+
+# obtener los nodos del arbol de expansión mínima que tienen grado impar
+def nodos_impares(arbol_expansion_minima, size):
     nodos = {}
     nodos_i = []
     for i in range(size):
-        nodos[i+1]=0
+        nodos[i+1] = 0
     for i in arbol_expansion_minima:
         for j in i:
-            nodos[j]=nodos.get(j)+1
+            nodos[j] = nodos.get(j)+1
     for i in nodos:
-        if nodos[i]%2!=0:
+        if nodos[i] % 2 != 0:
             nodos_i.append(i)
     return nodos_i
+
+
 def nodos_peso_mínimo(matriz, nodos_prueba):
     '''
     Encuentra los nodos con peso mínimo y crea una lista'''
@@ -162,11 +166,17 @@ def nodos_peso_mínimo(matriz, nodos_prueba):
                 nodos_prueba.append(np.array([index, tupla[j]]))
         index += 1
     return nodos_prueba
-def convertir_fila_columna_cero(matriz, fila, columna): #llena la matriz de ceros
+
+
+# llena la matriz de ceros
+def convertir_fila_columna_cero(matriz, fila, columna):
     matriz[fila, :] = 0  # Convertir toda la fila en ceros
     matriz[:, columna] = 0  # Convertir toda la columna en ceros
     return matriz
-def distancia_minima(matriz): #encontrar las aristas perfectas con costo mínimo, llama a las funciones nodos_peso_mínimo y convertir_fila_columna_cero
+
+
+# encontrar las aristas perfectas con costo mínimo, llama a las funciones nodos_peso_mínimo y convertir_fila_columna_cero
+def distancia_minima(matriz):
     '''
     Con los nodos de peso mínimo que se obtienen de la función nodos_peso_mínimo, en esta se busca por cada loop se va reduciendo la matriz
     al llenarla de ceros para que no se rompa la regla que no deben existir aristas adyacentes y cumplir la condición de aristas perfectas
@@ -179,43 +189,62 @@ def distancia_minima(matriz): #encontrar las aristas perfectas con costo mínimo
     nodos = {}
     nodos_minimo = []
     nodos_p = nodos_peso_mínimo(matriz, nodos)
-    #print("Nodos peso mínimo: ",nodos_p)
-    while len(nodos_p)!=0:
+    # print("Nodos peso mínimo: ",nodos_p)
+    while len(nodos_p) != 0:
         nodos_minimo_n = []
         per = matriz.shape[0]
         matriz_reducida = matriz.copy()
-        #print("Matriz original: \n",per)
-        #print(matriz_reducida,"\n")
+        # print("Matriz original: \n",per)
+        # print(matriz_reducida,"\n")
         int = 0
         nodos_p_2 = nodos_p
-        while per>0:
-            #print("int: ",int)
+        while per > 0:
+            # print("int: ",int)
             nodos_p_3 = [nodos_p_2[0][0], nodos_p_2[0][1]]
-            #print("nodos: ",nodos_p_3)
-            matriz_reducida = convertir_fila_columna_cero(matriz_reducida, nodos_p_2[0][0], nodos_p_2[0][1])
-            matriz_reducida = convertir_fila_columna_cero(matriz_reducida, nodos_p_2[0][1], nodos_p_2[0][0])
+            # print("nodos: ",nodos_p_3)
+            matriz_reducida = convertir_fila_columna_cero(
+                matriz_reducida, nodos_p_2[0][0], nodos_p_2[0][1])
+            matriz_reducida = convertir_fila_columna_cero(
+                matriz_reducida, nodos_p_2[0][1], nodos_p_2[0][0])
             nodos_minimo_n.append(nodos_p_2[0]+1)
-            #print(matriz_reducida)
+            # print(matriz_reducida)
             nodos_p_2 = nodos_peso_mínimo(matriz_reducida, nodos)
-            int=int+1
-            per=per-2
+            int = int+1
+            per = per-2
         nodos_minimo.append(nodos_minimo_n)
         nodos_p.pop(0)
        # print("Nodos mínimos: ",nodos_minimo)
-        
+
         for i in nodos_minimo:
             suma = 0
             for j in range(len(i)):
                 suma += matriz[i[j][0] - 1, i[j][1] - 1]
             nodos[suma] = tuple(i)
            # print(suma, " : ", tuple(i))
-        #print("\n")
-    #print(nodos)
+        # print("\n")
+    # print(nodos)
     llave_min = min(nodos.keys())
-    #print(llave_min)
+    # print(llave_min)
     nodos = {llave_min: nodos[llave_min]}
     return nodos
-    
+
+
+def multigrafo(arbol_exp_min, aristas_perfectas):
+    """Encuentra el multigrafo que combina el árbol de expansión mínima del primer paso y las aristas perfectas del segundo paso """
+    multigrafo = nx.Multigraph(
+        arbol_exp_min)  # Crear multigrafo con las aristas del árbol de expansión mínima
+    # Añade las aristas perfectas al multigrafo
+    multigrafo.add_edges_from(aristas_perfectas)
+    return multigrafo
+
+
+def encontrar_ciclo_euleriano(multigrafo):
+    """Encuentra el ciclo euleriano en el multigrafo que combina el árbol de expansión mínima y las aristas perfectas"""
+    ciclo_euleriano = list(nx.eulerian_circuit(
+        multigrafo))  # Halla el ciclo euleriano del multigrafo
+    return ciclo_euleriano
+
+
 def main():
     # ---- Listar archivos automáticamente ----
     # Buscar archivos .tsp en la carpeta
@@ -243,7 +272,8 @@ def main():
 
         print("\nMatriz de distancias generada:")
         print(matriz_distancias)
-        dibujar_grafo_matriz_adyacencia(matriz_distancias, "Matriz de distancias")
+        dibujar_grafo_matriz_adyacencia(
+            matriz_distancias, "Matriz de distancias")
 
         # Primer paso algoritmo Christofides (Encontrar un arbol de expansión minima)
 
@@ -258,33 +288,47 @@ def main():
         )
 
         # Segundo paso algoritmo Christofides encontrar perfect matching minimum weight
-        
-        nodos_i = nodos_impares(arbol_expansion_minima, int(coordenadas.size/2))
+
+        nodos_i = nodos_impares(arbol_expansion_minima,
+                                int(coordenadas.size/2))
         coordenadas_i = []
         for i in nodos_i:
             coordenadas_i.append(coordenadas[i-1])
         matriz_distancias_i = calcular_matriz_distancias(coordenadas_i)
         print("Nodos I:", nodos_i)
-        #print(coordenadas_i)
-        #print(matriz_distancias_i)
-        dibujar_grafo_matriz_adyacencia(matriz_distancias_i, "Matriz de distancias")
+        # print(coordenadas_i)
+        # print(matriz_distancias_i)
+        dibujar_grafo_matriz_adyacencia(
+            matriz_distancias_i, "Matriz de distancias")
         nodos = distancia_minima(matriz_distancias_i)
-        #print(nodos)
+        # print(nodos)
         valores_lista = []
         for i in nodos.values():
             for j in i:
                 valores_lista.append(j)
-        #Nodos i: [1, 2, 3,  4,  5,  6,  7,  8,  9, 10, 11, 12]
-        #Nodos I: [6, 7, 8, 11, 12, 19, 20, 21, 26, 29, 37, 38]
+        # Nodos i: [1, 2, 3,  4,  5,  6,  7,  8,  9, 10, 11, 12]
+        # Nodos I: [6, 7, 8, 11, 12, 19, 20, 21, 26, 29, 37, 38]
         lista_pmmw = []
         for i in valores_lista:
             lista_pmmw.append(np.array([nodos_i[i[0]-1], nodos_i[i[1]-1]]))
-        print("Aritas perfectas con costo mínimo:\n",lista_pmmw)
-        
-        
-        # Tercer paso algoritmo Christofides
+        print("Aristas perfectas con costo mínimo:\n", lista_pmmw)
 
-        # Cuarto paso algoritmo Christofides
+        # Tercer paso algoritmo Christofides (Juntar el árbol de expansión mínima y las aristas perfectas)
+
+        multigrafo_arbol_min_aristas_perf = multigrafo(
+            arbol_expansion_minima, lista_pmmw)
+        print("\nMultigrafo con aristas del arbol de expansión mínima y aristas perfectas creado:")
+        print(multigrafo_arbol_min_aristas_perf)
+        dibujar_grafo_lista_adyacencia(
+            multigrafo, "Multigrafo del árbol de expansión mínima más aristas perfectas")
+
+        # Cuarto paso algoritmo Christofides (Hallar el ciclo euleriano en el multigrafo)
+
+        ciclo_euleriano = encontrar_ciclo_euleriano(
+            multigrafo_arbol_min_aristas_perf)
+        print("\nCiclo euleriano encontrado:")
+        print(ciclo_euleriano)
+        dibujar_grafo_lista_adyacencia(ciclo_euleriano, "Ciclo Euleriano")
 
         # Quinto paso algoritmo Christofides
 
