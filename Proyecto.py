@@ -91,7 +91,7 @@ def leer_tsplib(nombre_archivo):
             if len(partes) == 3:  # ID, X, Y
                 _, x, y = map(float, partes)
                 coordenadas.append((x, y))
-
+    print(coordenadas)
     return np.array(coordenadas)
 
 
@@ -136,7 +136,86 @@ def encontrar_arbol_expansion_minima(w, s):
         E2.append([i[0] + 1, i[1] + 1])
     return [E2, suma]
 
-
+def nodos_impares(arbol_expansion_minima, size): #obtener los nodos del arbol de expansión mínima que tienen grado impar
+    nodos = {}
+    nodos_i = []
+    for i in range(size):
+        nodos[i+1]=0
+    for i in arbol_expansion_minima:
+        for j in i:
+            nodos[j]=nodos.get(j)+1
+    for i in nodos:
+        if nodos[i]%2!=0:
+            nodos_i.append(i)
+    return nodos_i
+def nodos_peso_mínimo(matriz, nodos_prueba):
+    '''
+    Encuentra los nodos con peso mínimo y crea una lista'''
+    nodos_prueba = []
+    index = 0
+    for i in matriz:
+        mask = i > 0
+        if np.any(mask):
+            min_val = np.min(i[mask])
+            tupla = np.where(i == min_val)[0]
+            for j in range(tupla.shape[0]):
+                nodos_prueba.append(np.array([index, tupla[j]]))
+        index += 1
+    return nodos_prueba
+def convertir_fila_columna_cero(matriz, fila, columna): #llena la matriz de ceros
+    matriz[fila, :] = 0  # Convertir toda la fila en ceros
+    matriz[:, columna] = 0  # Convertir toda la columna en ceros
+    return matriz
+def distancia_minima(matriz): #encontrar las aristas perfectas con costo mínimo, llama a las funciones nodos_peso_mínimo y convertir_fila_columna_cero
+    '''
+    Con los nodos de peso mínimo que se obtienen de la función nodos_peso_mínimo, en esta se busca por cada loop se va reduciendo la matriz
+    al llenarla de ceros para que no se rompa la regla que no deben existir aristas adyacentes y cumplir la condición de aristas perfectas
+    cada combinación se guarda en un diccionario con la llave como la suma de los pesos y el valor las aristas perfectas, se pasa por todos
+    los nodos de peso mínimo para encontrar todas las permutaciones posibles, al ser una matriz par, siempre se van a encontrar
+    arístas perfectas, se va probado todas las permutaciones que se obtuvieron de los nodos de costo mínimo y se agregan a un diccionario
+    donde la llave es el costo total de la combinación de nodos y el valor es la combinación de nodos, luego se extrae las tuplas que tengan
+    la llave de menor costo.
+    '''
+    nodos = {}
+    nodos_minimo = []
+    nodos_p = nodos_peso_mínimo(matriz, nodos)
+    #print("Nodos peso mínimo: ",nodos_p)
+    while len(nodos_p)!=0:
+        nodos_minimo_n = []
+        per = matriz.shape[0]
+        matriz_reducida = matriz.copy()
+        #print("Matriz original: \n",per)
+        #print(matriz_reducida,"\n")
+        int = 0
+        nodos_p_2 = nodos_p
+        while per>0:
+            #print("int: ",int)
+            nodos_p_3 = [nodos_p_2[0][0], nodos_p_2[0][1]]
+            #print("nodos: ",nodos_p_3)
+            matriz_reducida = convertir_fila_columna_cero(matriz_reducida, nodos_p_2[0][0], nodos_p_2[0][1])
+            matriz_reducida = convertir_fila_columna_cero(matriz_reducida, nodos_p_2[0][1], nodos_p_2[0][0])
+            nodos_minimo_n.append(nodos_p_2[0]+1)
+            #print(matriz_reducida)
+            nodos_p_2 = nodos_peso_mínimo(matriz_reducida, nodos)
+            int=int+1
+            per=per-2
+        nodos_minimo.append(nodos_minimo_n)
+        nodos_p.pop(0)
+       # print("Nodos mínimos: ",nodos_minimo)
+        
+        for i in nodos_minimo:
+            suma = 0
+            for j in range(len(i)):
+                suma += matriz[i[j][0] - 1, i[j][1] - 1]
+            nodos[suma] = tuple(i)
+           # print(suma, " : ", tuple(i))
+        #print("\n")
+    #print(nodos)
+    llave_min = min(nodos.keys())
+    #print(llave_min)
+    nodos = {llave_min: nodos[llave_min]}
+    return nodos
+    
 def main():
     # ---- Listar archivos automáticamente ----
     # Buscar archivos .tsp en la carpeta
@@ -178,8 +257,31 @@ def main():
             arbol_expansion_minima, "Arbol de expansión minima"
         )
 
-        # Segundo paso algoritmo Christofides
-
+        # Segundo paso algoritmo Christofides encontrar perfect matching minimum weight
+        
+        nodos_i = nodos_impares(arbol_expansion_minima, int(coordenadas.size/2))
+        coordenadas_i = []
+        for i in nodos_i:
+            coordenadas_i.append(coordenadas[i-1])
+        matriz_distancias_i = calcular_matriz_distancias(coordenadas_i)
+        print("Nodos I:", nodos_i)
+        #print(coordenadas_i)
+        #print(matriz_distancias_i)
+        dibujar_grafo_matriz_adyacencia(matriz_distancias_i, "Matriz de distancias")
+        nodos = distancia_minima(matriz_distancias_i)
+        #print(nodos)
+        valores_lista = []
+        for i in nodos.values():
+            for j in i:
+                valores_lista.append(j)
+        #Nodos i: [1, 2, 3,  4,  5,  6,  7,  8,  9, 10, 11, 12]
+        #Nodos I: [6, 7, 8, 11, 12, 19, 20, 21, 26, 29, 37, 38]
+        lista_pmmw = []
+        for i in valores_lista:
+            lista_pmmw.append(np.array([nodos_i[i[0]-1], nodos_i[i[1]-1]]))
+        print("Aritas perfectas con costo mínimo:\n",lista_pmmw)
+        
+        
         # Tercer paso algoritmo Christofides
 
         # Cuarto paso algoritmo Christofides
