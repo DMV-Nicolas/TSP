@@ -1,23 +1,27 @@
 import os
 import numpy as np
+import networkx as nx
+import matplotlib.pyplot as plt
+
+dibujar_grafos = True
 
 
 def dibujar_grafo_lista_adyacencia(lista_adyacencia, titulo="Grafo"):
-    """Dibuja un grafo a partir de una lista de adyacencia."""
-
-    from networkx import Graph, draw
-    from matplotlib.pyplot import figure, title, show
+    """Dibuja un grafo a partir de una lista de adyacencia con nodos en posiciones fijas."""
+    if not dibujar_grafos:
+        return
 
     # Crear un grafo vacío
-    G = Graph()
-
+    G = nx.Graph()
     # Agregar las aristas desde la lista de adyacencia
     G.add_edges_from(lista_adyacencia)
 
     # Dibujar el grafo
-    figure(figsize=(8, 6))
-    draw(
+    pos = nx.spring_layout(G)
+    plt.figure(figsize=(8, 6))
+    nx.draw(
         G,
+        pos=pos,
         with_labels=True,
         node_color="lightblue",
         node_size=200,
@@ -25,8 +29,8 @@ def dibujar_grafo_lista_adyacencia(lista_adyacencia, titulo="Grafo"):
         font_weight="bold",
         edge_color="gray",
     )
-    title(titulo)
-    show()
+    plt.title(titulo)
+    plt.show()
 
 
 def dibujar_grafo_matriz_adyacencia(matriz_adyacencia, titulo="Grafo"):
@@ -35,12 +39,11 @@ def dibujar_grafo_matriz_adyacencia(matriz_adyacencia, titulo="Grafo"):
     - Los nodos se numeran de 1 a n
     - el grafo dibujado no esta representando las distancias entre cada nodo
     """
-
-    from networkx import Graph, draw, spring_layout
-    from matplotlib.pyplot import figure, title, show
+    if not dibujar_grafos:
+        return
 
     # Crear un grafo vacío
-    G = Graph()
+    G = nx.Graph()
 
     # Número de nodos
     n = len(matriz_adyacencia)
@@ -52,9 +55,9 @@ def dibujar_grafo_matriz_adyacencia(matriz_adyacencia, titulo="Grafo"):
                 G.add_edge(i + 1, j + 1, weight=matriz_adyacencia[i][j])
 
     # Dibujar el grafo
-    figure(figsize=(8, 6))
-    pos = spring_layout(G)  # Posición de los nodos
-    draw(
+    plt.figure(figsize=(8, 6))
+    pos = nx.spring_layout(G)  # Posición de los nodos
+    nx.draw(
         G,
         pos,
         with_labels=True,
@@ -65,8 +68,8 @@ def dibujar_grafo_matriz_adyacencia(matriz_adyacencia, titulo="Grafo"):
         edge_color="gray",
     )
 
-    title(titulo)
-    show()
+    plt.title(titulo)
+    plt.show()
 
 
 def leer_tsplib(nombre_archivo):
@@ -108,33 +111,50 @@ def calcular_matriz_distancias(coordenadas):
     return matriz
 
 
-def encontrar_arbol_expansion_minima(w, s):
-    """Encuentra un arbol de expansión minima"""
-    n = len(w)
-    v = []
-    while len(v) != n:
-        v.append(0)
-    v[s] = 1
-    E = []
-    suma = 0
-    for i in range(0, n - 1):
-        minimo = 1000  # Valor muy grande M
-        agregar_vertice = 0
-        e = []
-        for j in range(0, n):
-            if v[j] == 1:
-                for k in range(0, n):
-                    if v[k] == 0 and w[j][k] < minimo:
-                        agregar_vertice = k
-                        e = [j, k]
-                        minimo = w[j][k]
-        suma += w[e[0]][e[1]]
-        v[agregar_vertice] = 1
-        E.append(e)
-    E2 = []
-    for i in E:
-        E2.append([i[0] + 1, i[1] + 1])
-    return [E2, suma]
+def encontrar_arbol_expansion_minima(matriz):
+    def find(parent, i):
+        if parent[i] != i:
+            parent[i] = find(parent, parent[i])  # Compresión de ruta
+        return parent[i]
+
+    def union(parent, rank, x, y):
+        root_x = find(parent, x)
+        root_y = find(parent, y)
+
+        if root_x != root_y:
+            if rank[root_x] > rank[root_y]:
+                parent[root_y] = root_x
+            elif rank[root_x] < rank[root_y]:
+                parent[root_x] = root_y
+            else:
+                parent[root_y] = root_x
+                rank[root_x] += 1
+
+    def kruskal(adj_matrix):
+        edges = []
+        n = len(adj_matrix)
+
+        # Convertimos la matriz de adyacencia en una lista de aristas
+        for i in range(n):
+            for j in range(i + 1, n):
+                if adj_matrix[i][j] > 0:  # Solo consideramos pesos positivos
+                    edges.append((adj_matrix[i][j], i, j))
+
+        # Ordenamos las aristas por peso
+        edges.sort()
+
+        parent = list(range(n))
+        rank = [0] * n
+        mst = []
+
+        for weight, u, v in edges:
+            if find(parent, u) != find(parent, v):
+                union(parent, rank, u, v)
+                mst.append((u + 1, v + 1))  # Convertimos índices a base 1
+
+        return mst
+
+    return kruskal(matriz)
 
 
 # obtener los nodos del arbol de expansión mínima que tienen grado impar
@@ -142,10 +162,10 @@ def nodos_impares(arbol_expansion_minima, size):
     nodos = {}
     nodos_i = []
     for i in range(size):
-        nodos[i+1] = 0
+        nodos[i + 1] = 0
     for i in arbol_expansion_minima:
         for j in i:
-            nodos[j] = nodos.get(j)+1
+            nodos[j] = nodos.get(j) + 1
     for i in nodos:
         if nodos[i] % 2 != 0:
             nodos_i.append(i)
@@ -153,8 +173,8 @@ def nodos_impares(arbol_expansion_minima, size):
 
 
 def nodos_peso_mínimo(matriz, nodos_prueba):
-    '''
-    Encuentra los nodos con peso mínimo y crea una lista'''
+    """
+    Encuentra los nodos con peso mínimo y crea una lista"""
     nodos_prueba = []
     index = 0
     for i in matriz:
@@ -177,7 +197,7 @@ def convertir_fila_columna_cero(matriz, fila, columna):
 
 # encontrar las aristas perfectas con costo mínimo, llama a las funciones nodos_peso_mínimo y convertir_fila_columna_cero
 def distancia_minima(matriz):
-    '''
+    """
     Con los nodos de peso mínimo que se obtienen de la función nodos_peso_mínimo, en esta se busca por cada loop se va reduciendo la matriz
     al llenarla de ceros para que no se rompa la regla que no deben existir aristas adyacentes y cumplir la condición de aristas perfectas
     cada combinación se guarda en un diccionario con la llave como la suma de los pesos y el valor las aristas perfectas, se pasa por todos
@@ -185,7 +205,7 @@ def distancia_minima(matriz):
     arístas perfectas, se va probado todas las permutaciones que se obtuvieron de los nodos de costo mínimo y se agregan a un diccionario
     donde la llave es el costo total de la combinación de nodos y el valor es la combinación de nodos, luego se extrae las tuplas que tengan
     la llave de menor costo.
-    '''
+    """
     nodos = {}
     nodos_minimo = []
     nodos_p = nodos_peso_mínimo(matriz, nodos)
@@ -203,24 +223,26 @@ def distancia_minima(matriz):
             nodos_p_3 = [nodos_p_2[0][0], nodos_p_2[0][1]]
             # print("nodos: ",nodos_p_3)
             matriz_reducida = convertir_fila_columna_cero(
-                matriz_reducida, nodos_p_2[0][0], nodos_p_2[0][1])
+                matriz_reducida, nodos_p_2[0][0], nodos_p_2[0][1]
+            )
             matriz_reducida = convertir_fila_columna_cero(
-                matriz_reducida, nodos_p_2[0][1], nodos_p_2[0][0])
-            nodos_minimo_n.append(nodos_p_2[0]+1)
+                matriz_reducida, nodos_p_2[0][1], nodos_p_2[0][0]
+            )
+            nodos_minimo_n.append(nodos_p_2[0] + 1)
             # print(matriz_reducida)
             nodos_p_2 = nodos_peso_mínimo(matriz_reducida, nodos)
-            int = int+1
-            per = per-2
+            int = int + 1
+            per = per - 2
         nodos_minimo.append(nodos_minimo_n)
         nodos_p.pop(0)
-       # print("Nodos mínimos: ",nodos_minimo)
+        # print("Nodos mínimos: ",nodos_minimo)
 
         for i in nodos_minimo:
             suma = 0
             for j in range(len(i)):
                 suma += matriz[i[j][0] - 1, i[j][1] - 1]
             nodos[suma] = tuple(i)
-           # print(suma, " : ", tuple(i))
+        # print(suma, " : ", tuple(i))
         # print("\n")
     # print(nodos)
     llave_min = min(nodos.keys())
@@ -230,9 +252,10 @@ def distancia_minima(matriz):
 
 
 def multigrafo(arbol_exp_min, aristas_perfectas):
-    """Encuentra el multigrafo que combina el árbol de expansión mínima del primer paso y las aristas perfectas del segundo paso """
-    multigrafo = nx.Multigraph(
-        arbol_exp_min)  # Crear multigrafo con las aristas del árbol de expansión mínima
+    """Encuentra el multigrafo que combina el árbol de expansión mínima del primer paso y las aristas perfectas del segundo paso"""
+    multigrafo = nx.MultiGraph(
+        arbol_exp_min
+    )  # Crear multigrafo con las aristas del árbol de expansión mínima
     # Añade las aristas perfectas al multigrafo
     multigrafo.add_edges_from(aristas_perfectas)
     return multigrafo
@@ -240,9 +263,46 @@ def multigrafo(arbol_exp_min, aristas_perfectas):
 
 def encontrar_ciclo_euleriano(multigrafo):
     """Encuentra el ciclo euleriano en el multigrafo que combina el árbol de expansión mínima y las aristas perfectas"""
-    ciclo_euleriano = list(nx.eulerian_circuit(
-        multigrafo))  # Halla el ciclo euleriano del multigrafo
+    ciclo_euleriano = list(
+        nx.eulerian_circuit(multigrafo)
+    )  # Halla el ciclo euleriano del multigrafo
     return ciclo_euleriano
+
+
+def recortar_camino(ciclo_euleriano):
+    """
+    Recorta un ciclo/camino euleriano eliminando los vértices repetidos.
+
+    Ejemplo:
+        Input: [(29,30), (30,32), (32,35), (35,37), (37,38), (38,37), (37,33), (33,34)]
+        Output: [(29,30), (30,32), (32,35), (35,37), (37,38), (38,33), (33,34)]
+    """
+    if not ciclo_euleriano:
+        return []
+
+    # Convertir la lista de aristas en una lista de vértices.
+    # Se asume que la primera arista define el primer vértice.
+    vertices = [ciclo_euleriano[0][0]]
+    for u, v in ciclo_euleriano:
+        vertices.append(v)
+
+    # Recortar el camino: conservar solo la primera aparición de cada vértice.
+    camino_recortado = []
+    visitados = set()
+    for v in vertices:
+        if v not in visitados:
+            camino_recortado.append(v)
+            visitados.add(v)
+
+    # Reconstruir la lista de aristas a partir del camino recortado.
+    aristas_recortadas = [
+        [camino_recortado[i], camino_recortado[i + 1]]
+        for i in range(len(camino_recortado) - 1)
+    ]
+
+    aristas_recortadas.append([aristas_recortadas[-1][1], ciclo_euleriano[0][0]])
+
+    return aristas_recortadas
 
 
 def main():
@@ -272,36 +332,25 @@ def main():
 
         print("\nMatriz de distancias generada:")
         print(matriz_distancias)
-        dibujar_grafo_matriz_adyacencia(
-            matriz_distancias, "Matriz de distancias")
+        dibujar_grafo_matriz_adyacencia(matriz_distancias, "Matriz de distancias")
 
         # Primer paso algoritmo Christofides (Encontrar un arbol de expansión minima)
 
-        arbol_expansion_minima, _ = encontrar_arbol_expansion_minima(
-            matriz_distancias, 0
-        )
-
+        arbol_expansion_minima = encontrar_arbol_expansion_minima(matriz_distancias)
         print("\nArbol de expansión minima encontrado:")
         print(arbol_expansion_minima)
         dibujar_grafo_lista_adyacencia(
             arbol_expansion_minima, "Arbol de expansión minima"
         )
 
-        # Segundo paso algoritmo Christofides encontrar perfect matching minimum weight
+        # Segundo paso algoritmo Christofides (encontrar perfect matching minimum weight)
 
-        nodos_i = nodos_impares(arbol_expansion_minima,
-                                int(coordenadas.size/2))
+        nodos_i = nodos_impares(arbol_expansion_minima, int(coordenadas.size / 2))
         coordenadas_i = []
         for i in nodos_i:
-            coordenadas_i.append(coordenadas[i-1])
+            coordenadas_i.append(coordenadas[i - 1])
         matriz_distancias_i = calcular_matriz_distancias(coordenadas_i)
-        print("Nodos I:", nodos_i)
-        # print(coordenadas_i)
-        # print(matriz_distancias_i)
-        dibujar_grafo_matriz_adyacencia(
-            matriz_distancias_i, "Matriz de distancias")
         nodos = distancia_minima(matriz_distancias_i)
-        # print(nodos)
         valores_lista = []
         for i in nodos.values():
             for j in i:
@@ -310,27 +359,42 @@ def main():
         # Nodos I: [6, 7, 8, 11, 12, 19, 20, 21, 26, 29, 37, 38]
         lista_pmmw = []
         for i in valores_lista:
-            lista_pmmw.append(np.array([nodos_i[i[0]-1], nodos_i[i[1]-1]]))
+            lista_pmmw.append(np.array([nodos_i[i[0] - 1], nodos_i[i[1] - 1]]))
         print("Aristas perfectas con costo mínimo:\n", lista_pmmw)
+        dibujar_grafo_lista_adyacencia(lista_pmmw, "Aristas perfectas con costo mínimo")
 
         # Tercer paso algoritmo Christofides (Juntar el árbol de expansión mínima y las aristas perfectas)
 
         multigrafo_arbol_min_aristas_perf = multigrafo(
-            arbol_expansion_minima, lista_pmmw)
-        print("\nMultigrafo con aristas del arbol de expansión mínima y aristas perfectas creado:")
-        print(multigrafo_arbol_min_aristas_perf)
+            arbol_expansion_minima, lista_pmmw
+        )
+        multigrafo_lista_adyacencia = [
+            list(edge[:2]) for edge in multigrafo_arbol_min_aristas_perf.edges
+        ]
+        print(
+            "\nMultigrafo con aristas del arbol de expansión mínima y aristas perfectas:"
+        )
+        print(multigrafo_lista_adyacencia)
         dibujar_grafo_lista_adyacencia(
-            multigrafo, "Multigrafo del árbol de expansión mínima más aristas perfectas")
+            multigrafo_lista_adyacencia,
+            "Multigrafo con aristas perfectas",
+        )
 
         # Cuarto paso algoritmo Christofides (Hallar el ciclo euleriano en el multigrafo)
 
-        ciclo_euleriano = encontrar_ciclo_euleriano(
-            multigrafo_arbol_min_aristas_perf)
+        ciclo_euleriano = encontrar_ciclo_euleriano(multigrafo_arbol_min_aristas_perf)
         print("\nCiclo euleriano encontrado:")
         print(ciclo_euleriano)
         dibujar_grafo_lista_adyacencia(ciclo_euleriano, "Ciclo Euleriano")
 
-        # Quinto paso algoritmo Christofides
+        # Quinto paso algoritmo Christofides (Recortar el camino omitiendo los vertices que se vuelven a visitar)
+
+        ciclo_euleriano_recortado = recortar_camino(ciclo_euleriano)
+        print("\nCiclo euleriano recortado:")
+        print(ciclo_euleriano_recortado)
+        dibujar_grafo_lista_adyacencia(
+            ciclo_euleriano_recortado, "Ciclo euleriano recortado"
+        )
 
     else:
         print("Opción no válida. Intente de nuevo.")
