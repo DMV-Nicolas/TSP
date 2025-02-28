@@ -3,7 +3,7 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 
-dibujar_grafos = True
+dibujar_grafos = False
 
 
 def dibujar_grafo_lista_adyacencia(lista_adyacencia, titulo="Grafo"):
@@ -111,15 +111,15 @@ def calcular_matriz_distancias(coordenadas):
     return matriz
 
 
-def encontrar_arbol_expansion_minima(matriz):
-    def find(parent, i):
+def encontrar_arbol_expansion_minima(adj_matrix):
+    def _find(parent, i):
         if parent[i] != i:
-            parent[i] = find(parent, parent[i])  # Compresión de ruta
+            parent[i] = _find(parent, parent[i])  # Compresión de ruta
         return parent[i]
 
-    def union(parent, rank, x, y):
-        root_x = find(parent, x)
-        root_y = find(parent, y)
+    def _union(parent, rank, x, y):
+        root_x = _find(parent, x)
+        root_y = _find(parent, y)
 
         if root_x != root_y:
             if rank[root_x] > rank[root_y]:
@@ -130,31 +130,26 @@ def encontrar_arbol_expansion_minima(matriz):
                 parent[root_y] = root_x
                 rank[root_x] += 1
 
-    def kruskal(adj_matrix):
-        edges = []
-        n = len(adj_matrix)
+    edges = []
+    n = len(adj_matrix)
 
-        # Convertimos la matriz de adyacencia en una lista de aristas
-        for i in range(n):
-            for j in range(i + 1, n):
-                if adj_matrix[i][j] > 0:  # Solo consideramos pesos positivos
-                    edges.append((adj_matrix[i][j], i, j))
+    # Convertimos la matriz de adyacencia en una lista de aristas
+    for i in range(n):
+        for j in range(i + 1, n):
+            if adj_matrix[i][j] > 0:  # Solo consideramos pesos positivos
+                edges.append((adj_matrix[i][j], i, j))
 
-        # Ordenamos las aristas por peso
-        edges.sort()
+    # Ordenamos las aristas por peso
+    edges.sort()
+    parent = list(range(n))
+    rank = [0] * n
+    mst = []
+    for weight, u, v in edges:
+        if _find(parent, u) != _find(parent, v):
+            _union(parent, rank, u, v)
+            mst.append((u + 1, v + 1))  # Convertimos índices a base 1
 
-        parent = list(range(n))
-        rank = [0] * n
-        mst = []
-
-        for weight, u, v in edges:
-            if find(parent, u) != find(parent, v):
-                union(parent, rank, u, v)
-                mst.append((u + 1, v + 1))  # Convertimos índices a base 1
-
-        return mst
-
-    return kruskal(matriz)
+    return mst
 
 
 # obtener los nodos del arbol de expansión mínima que tienen grado impar
@@ -325,6 +320,12 @@ def main():
     # Validar la opcion ingresada
     if opcion.isdigit() and 1 <= int(opcion) <= len(archivos_disponibles):
         archivo_seleccionado = archivos_disponibles[int(opcion) - 1]
+
+        opcion = input("Desea mostrar imagenes de los grafos? [S/N] ")
+        if opcion.lower() == "s":
+            global dibujar_grafos
+            dibujar_grafos = True
+
         print(f"\nCargando archivo: {archivo_seleccionado} ...")
 
         coordenadas = leer_tsplib(archivo_seleccionado)
@@ -343,7 +344,7 @@ def main():
             arbol_expansion_minima, "Arbol de expansión minima"
         )
 
-        # Segundo paso algoritmo Christofides (encontrar perfect matching minimum weight)
+        # Segundo paso algoritmo Christofides (Encontrar perfect matching minimum weight)
 
         nodos_i = nodos_impares(arbol_expansion_minima, int(coordenadas.size / 2))
         coordenadas_i = []
@@ -390,7 +391,7 @@ def main():
         # Quinto paso algoritmo Christofides (Recortar el camino omitiendo los vertices que se vuelven a visitar)
 
         ciclo_euleriano_recortado = recortar_camino(ciclo_euleriano)
-        print("\nCiclo euleriano recortado:")
+        print("\nRecorrido TSP:")
         print(ciclo_euleriano_recortado)
         dibujar_grafo_lista_adyacencia(
             ciclo_euleriano_recortado, "Ciclo euleriano recortado"
